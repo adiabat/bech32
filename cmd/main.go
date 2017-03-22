@@ -7,7 +7,15 @@ import (
 )
 
 func main() {
-	s := bech32.Mech()
-	fmt.Printf("%s\n", s)
+
+	sr := []byte("XokokOKOKOxxzzzzwwwzzzzzzzzX--@@@!!}{--")
+	five := bech32.Bytes8to5(sr)
+	fmt.Printf("%x\n", five)
+	eight, err := bech32.Bytes5to8(five)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("back to %x which is:\n%s\n", eight, eight)
+
 	return
 }
