@@ -43,5 +43,14 @@ func main() {
 	fmt.Printf("data+checksum %x\n", fivesum)
 	worked := bech32.VerifyChecksum(hrp, fivesum)
 	fmt.Printf("checksum %v\n", worked)
+
+	chk = bech32.CreateChecksum(hrp, sr)
+	// append checksum to end
+	srsum := append(sr, chk...)
+
+	fmt.Printf("data+checksum %x\n", srsum)
+	worked = bech32.VerifyChecksum(hrp, srsum)
+	fmt.Printf("checksum %v\n", worked)
+
 	return
 }

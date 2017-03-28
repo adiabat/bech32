@@ -148,13 +148,13 @@ func PolyMod(values []byte) uint32 {
 
 	for _, v := range values {
 		top := chk >> 25
-		chk = ((chk & 0x01ffffff) << 5) ^ uint32(v)
+		chk = (chk&0x1ffffff)<<5 ^ uint32(v)
 		for i, g := range gen {
 			if (top>>uint8(i))&1 == 1 {
 				chk ^= g
 			}
 		}
-		fmt.Printf("v %x chk %x\n", v, chk)
+		//		fmt.Printf("v %x chk %x\n", v, chk)
 	}
 
 	return chk
@@ -187,6 +187,7 @@ func CreateChecksum(hrp string, data []byte) []byte {
 	values = append(values, make([]byte, 6)...)
 	//	get checksum for whole slice
 	checksum := PolyMod(values)
+	fmt.Printf("got checksum %x\n", checksum)
 	var output [4]byte
 	output[0] = byte((checksum >> 24) & 0xff)
 	output[1] = byte((checksum >> 16) & 0xff)
@@ -200,6 +201,7 @@ func CreateChecksum(hrp string, data []byte) []byte {
 func VerifyChecksum(hrp string, data []byte) bool {
 	values := append(HRPExpand(hrp), data...)
 	checksum := PolyMod(values)
+	fmt.Printf("got checksum %x\n", checksum)
 	return checksum == 1
 }
 
