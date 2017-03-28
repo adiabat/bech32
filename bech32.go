@@ -4,10 +4,15 @@ import "fmt"
 
 const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
-func Mech() string {
-	s := fmt.Sprintf("%c", charset[2])
-	return s
-}
+var inverseCharset = [256]int8{
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	15, -1, 10, 17, 21, 20, 26, 30, 7, 5, -1, -1, -1, -1, -1, -1,
+	-1, 29, -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1,
+	1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1,
+	-1, 29, -1, 24, 13, 25, 9, 8, 23, -1, 18, 22, 31, 27, 19, -1,
+	1, 0, 3, 16, 11, 28, 12, 14, 6, 4, 2, -1, -1, -1, -1, -1}
 
 // Bytes8to5 extends a byte slice into a longer, padded byte slice of 5-bit elements
 // where the high 3 bits are all 0.
@@ -110,23 +115,53 @@ func Bytes5to8(input []byte) ([]byte, error) {
 	return dest, nil
 }
 
-// Bech32PolyModStep operates on 4 bytes at a time...
-func Bech32PolyModStep(pre uint32) uint32 {
+// EncodeString swaps 5-bit bytes with a string of the corresponding letters
+func EncodeString(input []byte) (string, error) {
+	var s string
+	for i, c := range input {
+		if c&0xe0 != 0 {
+			return "", fmt.Errorf("high bits set at position %d: %x", i, c)
+		}
+		s += string(charset[c])
+	}
+	return s, nil
+}
+
+func DecodeString(input string) ([]byte, error) {
+	b := make([]byte, len(input))
+	for i, c := range input {
+		if inverseCharset[c] == -1 {
+			return nil, fmt.Errorf("contains invalid character %s", c)
+		}
+		b[i] = byte(inverseCharset[c])
+	}
+	return b, nil
+}
+
+// PolyMod takes a slice and give the polymod *uint32*.  I think
+func PolyMod(values []byte) uint32 {
 	gen := []uint32{
 		0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3,
 	}
 
-	b := uint8(pre >> 25)
+	chk := uint32(1)
 
-	chk := (pre & 0x1fffffff) << 5
-
-	for i, g := range gen {
-		chk ^= -(uint32(b>>uint8(i)) & 1) & g
+	for _, v := range values {
+		top := chk >> 25
+		chk = ((chk & 0x01ffffff) << 5) ^ uint32(v)
+		for i, g := range gen {
+			if (top>>uint8(i))&1 == 1 {
+				chk ^= g
+			}
+		}
+		fmt.Printf("v %x chk %x\n", v, chk)
 	}
+
 	return chk
 }
 
-func Bech32HRPExpand(input string) []byte {
+// HRPExpand turns the human redable part into 5bit-bytes for later processing
+func HRPExpand(input string) []byte {
 	output := make([]byte, (len(input)*2)+1)
 
 	// first half is the input string shifted down 5 bits.
@@ -145,28 +180,44 @@ func Bech32HRPExpand(input string) []byte {
 	return output
 }
 
-func Bech32CreateChecksum(hrp string, data []byte) []byte {
-	values := append(Bech32HRPExpand(hrp), data...)
+// create checksum makes a 4 byte checksum from the HRP and data parts
+func CreateChecksum(hrp string, data []byte) []byte {
+	values := append(HRPExpand(hrp), data...)
 	// put 6 zero bytes on at the end
 	values = append(values, make([]byte, 6)...)
-	//	iterate through values applying polyMod
+	//	get checksum for whole slice
+	checksum := PolyMod(values)
+	var output [4]byte
+	output[0] = byte((checksum >> 24) & 0xff)
+	output[1] = byte((checksum >> 16) & 0xff)
+	output[2] = byte((checksum >> 8) & 0xff)
+	output[3] = byte(checksum & 0xff)
+	output[3] ^= 0x01
 
-	//checksum := Bech32PolyModStep(values)
-	// flip the LSB for good luck
-	//	checksum ^= 1
-	return nil
+	return Bytes8to5(output[:])
 }
 
-func Bech32VerifyChecksum(hrp string, data []byte) bool {
-	return false
+func VerifyChecksum(hrp string, data []byte) bool {
+	values := append(HRPExpand(hrp), data...)
+	checksum := PolyMod(values)
+	return checksum == 1
 }
 
-func Bech32Encode(hrp string, data []byte) string {
+func Encode(hrp string, data []byte) string {
 	return "test"
 }
 
 func Bech32Decode(hrp string, data []byte) ([]byte, error) {
 
+	return nil, nil
+}
+
+func AddressEncode(hrp string, data []byte) (string, error) {
+	//	combined := append(data, CreateChecksum(hrp, data))
+	return "", nil
+}
+
+func AddressDecode(adr string) ([]byte, error) {
 	return nil, nil
 }
 
