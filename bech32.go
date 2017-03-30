@@ -105,8 +105,15 @@ func Bytes5to8(input []byte) ([]byte, error) {
 			fallthrough
 		case 2:
 			dest[outputOffset] = input[0]<<3 | input[1]>>2
-		case 1:
-			dest[outputOffset] = input[0]
+
+			// break here
+			/*		case 6:
+						dest[outputOffset+3] = input[4]<<7 | input[5]>>1
+					case 3:
+						dest[outputOffset+2] = input[3]
+					case 1:
+						dest[outputOffset] = input[0]
+			*/
 		}
 
 		// if there are fewer than 8 characters left in the input string, we're done
@@ -215,7 +222,11 @@ func VerifyChecksum(hrp string, data []byte) bool {
 
 func Encode(hrp string, data []byte) string {
 	fiveData := Bytes8to5(data)
-	combined := append(fiveData, CreateChecksum(hrp, fiveData)...)
+	return EncodeSquashed(hrp, fiveData)
+}
+
+func EncodeSquashed(hrp string, data []byte) string {
+	combined := append(data, CreateChecksum(hrp, data)...)
 
 	// ignore error as we just five'd it
 	dataString, err := BytesToString(combined)
@@ -227,6 +238,18 @@ func Encode(hrp string, data []byte) string {
 }
 
 func Decode(adr string) (string, []byte, error) {
+	hrp, squashedData, err := DecodeSquashed(adr)
+	if err != nil {
+		return "", nil, err
+	}
+	data, err := Bytes5to8(squashedData)
+	if err != nil {
+		return "", nil, err
+	}
+	return hrp, data, nil
+}
+
+func DecodeSquashed(adr string) (string, []byte, error) {
 
 	lowAdr := strings.ToLower(adr)
 	highAdr := strings.ToUpper(adr)
@@ -255,12 +278,7 @@ func Decode(adr string) (string, []byte, error) {
 	}
 	data = data[:len(data)-6]
 
-	// shouldn't have any errors here I think
-	fullData, err := Bytes5to8(data)
-	if err != nil {
-		return "", nil, err
-	}
-	return hrp, fullData, nil
+	return hrp, data, nil
 }
 
 func SegWitAddressEncode(hrp string, data []byte) (string, error) {
@@ -269,7 +287,32 @@ func SegWitAddressEncode(hrp string, data []byte) (string, error) {
 }
 
 func SegWitAddressDecode(adr string) ([]byte, error) {
-	return nil, nil
+	hrp, squashedData, err := DecodeSquashed(adr)
+	if err != nil {
+		return nil, err
+	}
+	// the segwit version byte is directly put into a 5bit squashed byte
+	// since it maxes out at 16, wasting ~1 byte instead of 4.
+
+	version := squashedData[0]
+	data, err := Bytes5to8(squashedData[1:])
+	if err != nil {
+		return nil, err
+	}
+	if hrp != "bc" && hrp != "tb" {
+		return nil, fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
+	}
+	if len(data) < 2 || len(data) > 40 {
+		return nil, fmt.Errorf("Data length %d out of bounds", len(data))
+	}
+
+	if version > 16 {
+		return nil, fmt.Errorf("Invalid witness program version %d", data[0])
+	}
+	if version == 0 && len(data) != 20 && len(data) != 32 {
+		return nil, fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
+	}
+	return append([]byte{version}, data...), nil
 }
 
 //
