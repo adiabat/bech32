@@ -92,28 +92,32 @@ func Bytes5to8(input []byte) ([]byte, error) {
 
 		switch len(input) {
 		default:
-			dest[outputOffset+4] = input[6]<<5 | input[7]
+			dest[outputOffset+4] = input[7]
 			fallthrough
 		case 7:
-			dest[outputOffset+3] = input[4]<<7 | input[5]<<2 | input[6]>>3
+			dest[outputOffset+4] |= input[6] << 5
+			dest[outputOffset+3] = input[6] >> 3
+			fallthrough
+		case 6:
+			dest[outputOffset+3] |= input[5] << 2
 			fallthrough
 		case 5:
-			dest[outputOffset+2] = input[3]<<4 | input[4]>>1
+			dest[outputOffset+3] |= input[4] << 7
+			dest[outputOffset+2] = input[4] >> 1
 			fallthrough
 		case 4:
-			dest[outputOffset+1] = input[1]<<6 | input[2]<<1 | input[3]>>4
+			dest[outputOffset+2] |= input[3] << 4
+			dest[outputOffset+1] = input[3] >> 4
+			fallthrough
+		case 3:
+			dest[outputOffset+1] |= input[2] << 1
 			fallthrough
 		case 2:
-			dest[outputOffset] = input[0]<<3 | input[1]>>2
-
-			// break here
-			/*		case 6:
-						dest[outputOffset+3] = input[4]<<7 | input[5]>>1
-					case 3:
-						dest[outputOffset+2] = input[3]
-					case 1:
-						dest[outputOffset] = input[0]
-			*/
+			dest[outputOffset+1] |= input[1] << 6
+			dest[outputOffset] = input[1] >> 2
+			fallthrough
+		case 1:
+			dest[outputOffset] |= input[0] << 3
 		}
 
 		// if there are fewer than 8 characters left in the input string, we're done
