@@ -8,6 +8,31 @@ import (
 )
 
 func main() {
+	testAdr := "split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w"
+
+	hrp, decodedData, err := bech32.Decode(testAdr)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("decoded data: %x\n", decodedData)
+
+	//	testBytes := make([]byte, 32)
+	//	for i, _ := range testBytes {
+	//		testBytes[i] = byte(i)
+	//	}
+
+	//	fmt.Printf("testBytes: %x\n", testBytes)
+
+	adr := bech32.Encode(hrp, decodedData)
+
+	//	fmt.Printf("testadr: %s\n", testAdr)
+	fmt.Printf("start  : %s\n", testAdr)
+	fmt.Printf("encoded: %s\n", adr)
+
+}
+
+func main1() {
 
 	sr := make([]byte, 22)
 	_, _ = rand.Read(sr)
@@ -17,40 +42,12 @@ func main() {
 	five := bech32.Bytes8to5(sr)
 	fmt.Printf("%x\n", five)
 
-	fivestring, err := bech32.EncodeString(five)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("len %d encoded: %s\n", len(fivestring), fivestring)
-
-	fiveback, err := bech32.DecodeString(fivestring)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("back to %x\n", fiveback)
-	eight, err := bech32.Bytes5to8(five)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("back to %x\n", eight)
-
-	hrp := "bc"
-
-	chk := bech32.CreateChecksum(hrp, five)
-	// append checksum to end
-	fivesum := append(five, chk...)
-
-	fmt.Printf("data+checksum %x\n", fivesum)
-	worked := bech32.VerifyChecksum(hrp, fivesum)
-	fmt.Printf("checksum %v\n", worked)
-
-	chk = bech32.CreateChecksum(hrp, sr)
-	// append checksum to end
-	srsum := append(sr, chk...)
-
-	fmt.Printf("data+checksum %x\n", srsum)
-	worked = bech32.VerifyChecksum(hrp, srsum)
-	fmt.Printf("checksum %v\n", worked)
-
 	return
 }
+
+/*
+	testBytes := make([]byte, 32)
+	for i, _ := range testBytes {
+		testBytes[i] = byte(i)
+	}
+*/

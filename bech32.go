@@ -1,6 +1,9 @@
 package bech32
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
@@ -26,6 +29,7 @@ func Bytes8to5(input []byte) []byte {
 
 	outputOffset := 0
 
+	//	fmt.Printf("8 to 5 input len %d output len %d\n", len(input), len(dest))
 	// Continue until input has been consumed
 	for len(input) > 0 {
 
@@ -82,6 +86,8 @@ func Bytes5to8(input []byte) ([]byte, error) {
 	// round up and divide to get output length
 	dest := make([]byte, (((len(input) * 5) + 7) / 8))
 
+	//	fmt.Printf("5 to 8 input len %d output len %d\n", len(input), len(dest))
+
 	for len(input) > 0 {
 
 		switch len(input) {
@@ -99,9 +105,11 @@ func Bytes5to8(input []byte) ([]byte, error) {
 			fallthrough
 		case 2:
 			dest[outputOffset] = input[0]<<3 | input[1]>>2
+		case 1:
+			dest[outputOffset] = input[0]
 		}
 
-		// if there is less than 8 characters left in the input string, we're done
+		// if there are fewer than 8 characters left in the input string, we're done
 		if len(input) < 8 {
 			break
 		}
@@ -116,7 +124,7 @@ func Bytes5to8(input []byte) ([]byte, error) {
 }
 
 // EncodeString swaps 5-bit bytes with a string of the corresponding letters
-func EncodeString(input []byte) (string, error) {
+func BytesToString(input []byte) (string, error) {
 	var s string
 	for i, c := range input {
 		if c&0xe0 != 0 {
@@ -127,11 +135,11 @@ func EncodeString(input []byte) (string, error) {
 	return s, nil
 }
 
-func DecodeString(input string) ([]byte, error) {
+func StringToBytes(input string) ([]byte, error) {
 	b := make([]byte, len(input))
 	for i, c := range input {
 		if inverseCharset[c] == -1 {
-			return nil, fmt.Errorf("contains invalid character %s", c)
+			return nil, fmt.Errorf("contains invalid character %s", string(c))
 		}
 		b[i] = byte(inverseCharset[c])
 	}
@@ -154,7 +162,6 @@ func PolyMod(values []byte) uint32 {
 				chk ^= g
 			}
 		}
-		//		fmt.Printf("v %x chk %x\n", v, chk)
 	}
 
 	return chk
@@ -180,46 +187,88 @@ func HRPExpand(input string) []byte {
 	return output
 }
 
-// create checksum makes a 4 byte checksum from the HRP and data parts
+// create checksum makes a 6-shortbyte checksum from the HRP and data parts
 func CreateChecksum(hrp string, data []byte) []byte {
 	values := append(HRPExpand(hrp), data...)
 	// put 6 zero bytes on at the end
 	values = append(values, make([]byte, 6)...)
-	//	get checksum for whole slice
-	checksum := PolyMod(values)
-	fmt.Printf("got checksum %x\n", checksum)
-	var output [4]byte
-	output[0] = byte((checksum >> 24) & 0xff)
-	output[1] = byte((checksum >> 16) & 0xff)
-	output[2] = byte((checksum >> 8) & 0xff)
-	output[3] = byte(checksum & 0xff)
-	output[3] ^= 0x01
+	//get checksum for whole slice
 
-	return Bytes8to5(output[:])
+	checksum := PolyMod(values) ^ 1
+
+	for i := 0; i < 6; i++ {
+		// note that this is NOT the same as converting 8 to 5
+		// this is it's own expansion to 6 bytes from 4, chopping
+		// off the MSBs.
+		values[(len(values)-6)+i] = byte(checksum>>(5*(5-uint32(i)))) & 0x1f
+	}
+
+	return values[len(values)-6:]
 }
 
 func VerifyChecksum(hrp string, data []byte) bool {
 	values := append(HRPExpand(hrp), data...)
 	checksum := PolyMod(values)
-	fmt.Printf("got checksum %x\n", checksum)
+	//	fmt.Printf("checksum %x\n", checksum)
 	return checksum == 1
 }
 
 func Encode(hrp string, data []byte) string {
-	return "test"
+	fiveData := Bytes8to5(data)
+	combined := append(fiveData, CreateChecksum(hrp, fiveData)...)
+
+	// ignore error as we just five'd it
+	dataString, err := BytesToString(combined)
+	if err != nil {
+		panic(err)
+	}
+
+	return hrp + "1" + dataString
 }
 
-func Bech32Decode(hrp string, data []byte) ([]byte, error) {
+func Decode(adr string) (string, []byte, error) {
 
-	return nil, nil
+	lowAdr := strings.ToLower(adr)
+	highAdr := strings.ToUpper(adr)
+
+	if adr != lowAdr && adr != highAdr {
+		return "", nil, fmt.Errorf("mixed case address")
+	}
+
+	adr = lowAdr
+
+	// find the last "1" and split there
+	splitLoc := strings.LastIndex(adr, "1")
+	if splitLoc == -1 {
+		return "", nil, fmt.Errorf("1 separator not present in address")
+	}
+	hrp := adr[0:splitLoc]
+
+	data, err := StringToBytes(adr[splitLoc+1:])
+	if err != nil {
+		return "", nil, err
+	}
+
+	sumOK := VerifyChecksum(hrp, data)
+	if !sumOK {
+		return "", nil, fmt.Errorf("Checksum invalid")
+	}
+	data = data[:len(data)-6]
+
+	// shouldn't have any errors here I think
+	fullData, err := Bytes5to8(data)
+	if err != nil {
+		return "", nil, err
+	}
+	return hrp, fullData, nil
 }
 
-func AddressEncode(hrp string, data []byte) (string, error) {
+func SegWitAddressEncode(hrp string, data []byte) (string, error) {
 	//	combined := append(data, CreateChecksum(hrp, data))
 	return "", nil
 }
 
-func AddressDecode(adr string) ([]byte, error) {
+func SegWitAddressDecode(adr string) ([]byte, error) {
 	return nil, nil
 }
 
