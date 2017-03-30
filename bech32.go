@@ -19,119 +19,156 @@ var inverseCharset = [256]int8{
 
 // Bytes8to5 extends a byte slice into a longer, padded byte slice of 5-bit elements
 // where the high 3 bits are all 0.
-// I guess you never need to pad...?
+// Need to pad here, but not in the 5 to 8 function
 func Bytes8to5(input []byte) []byte {
+	// no way to triger an error going from 8 to 5
+	output, _ := ByteSquasher(input, 8, 5)
+	return output
+	/*
+		// round up divistion for output length
+		outputLength := (((len(input)) * 8) + 4) / 5
 
-	// round up divistion for output length
-	outputLength := (((len(input)) * 8) + 4) / 5
+		dest := make([]byte, outputLength)
 
-	dest := make([]byte, outputLength)
+		outputOffset := 0
 
-	outputOffset := 0
+		//	fmt.Printf("8 to 5 input len %d output len %d\n", len(input), len(dest))
+		// Continue until input has been consumed
+		for len(input) > 0 {
 
-	//	fmt.Printf("8 to 5 input len %d output len %d\n", len(input), len(dest))
-	// Continue until input has been consumed
-	for len(input) > 0 {
+			// 5 input bytes, map to 8 output bytes
+			// got switches from base32 stdlib
+			switch len(input) {
+			default:
+				dest[outputOffset+7] = input[4] & 0x1f
+				dest[outputOffset+6] = input[4] >> 5
+				fallthrough
+			case 4:
+				dest[outputOffset+6] |= (input[3] << 3) & 0x1f
+				dest[outputOffset+5] = (input[3] >> 2) & 0x1f
+				dest[outputOffset+4] = input[3] >> 7
+				fallthrough
+			case 3:
+				dest[outputOffset+4] |= (input[2] << 1) & 0x1f
+				dest[outputOffset+3] = (input[2] >> 4) & 0x1f
+				fallthrough
+			case 2:
+				dest[outputOffset+3] |= (input[1] << 4) & 0x1f
+				dest[outputOffset+2] = (input[1] >> 1) & 0x1f
+				dest[outputOffset+1] = (input[1] >> 6) & 0x1f
+				fallthrough
+			case 1:
+				dest[outputOffset+1] |= (input[0] << 2) & 0x1f
+				dest[outputOffset+0] = input[0] >> 3
+			}
 
-		// 5 input bytes, map to 8 output bytes
-		// got switches from base32 stdlib
-		switch len(input) {
-		default:
-			dest[outputOffset+7] = input[4] & 0x1f
-			dest[outputOffset+6] = input[4] >> 5
-			fallthrough
-		case 4:
-			dest[outputOffset+6] |= (input[3] << 3) & 0x1f
-			dest[outputOffset+5] = (input[3] >> 2) & 0x1f
-			dest[outputOffset+4] = input[3] >> 7
-			fallthrough
-		case 3:
-			dest[outputOffset+4] |= (input[2] << 1) & 0x1f
-			dest[outputOffset+3] = (input[2] >> 4) & 0x1f
-			fallthrough
-		case 2:
-			dest[outputOffset+3] |= (input[1] << 4) & 0x1f
-			dest[outputOffset+2] = (input[1] >> 1) & 0x1f
-			dest[outputOffset+1] = (input[1] >> 6) & 0x1f
-			fallthrough
-		case 1:
-			dest[outputOffset+1] |= (input[0] << 2) & 0x1f
-			dest[outputOffset+0] = input[0] >> 3
+			if len(input) < 5 {
+				break
+			}
+
+			// pop off first 5 bytes of input slice as we're done with them
+			input = input[5:]
+			// our output slice has advanced 8 bytes for the next round
+			outputOffset += 8
 		}
 
-		if len(input) < 5 {
-			break
-		}
-
-		// pop off first 5 bytes of input slice as we're done with them
-		input = input[5:]
-		// our output slice has advanced 8 bytes for the next round
-		outputOffset += 8
-	}
-
-	return dest
+		return dest */
 }
 
 func Bytes5to8(input []byte) ([]byte, error) {
 
-	// first check that high 3 bits for all bytes are 0
-	for i, b := range input {
-		if b&0xe0 != 0 {
-			return nil, fmt.Errorf("Invalid byte at position %d: %x", i, b)
+	return ByteSquasher(input, 5, 8)
+
+	/*
+		// first check that high 3 bits for all bytes are 0
+		for i, b := range input {
+			if b&0xe0 != 0 {
+				return nil, fmt.Errorf("Invalid byte at position %d: %x", i, b)
+			}
+		}
+
+		outputOffset := 0
+
+		// round up and divide to get output length
+		dest := make([]byte, (((len(input) * 5) + 7) / 8))
+
+		fmt.Printf("5 to 8 input len %d output len %d\n", len(input), len(dest))
+
+		for len(input) > 0 {
+
+			switch len(input) {
+			default:
+				dest[outputOffset+4] = input[7]
+				fallthrough
+			case 7:
+				dest[outputOffset+4] |= input[6] << 5
+				dest[outputOffset+3] = input[6] >> 3
+				fallthrough
+			case 6:
+				dest[outputOffset+3] |= input[5] << 2
+				fallthrough
+			case 5:
+				dest[outputOffset+3] |= input[4] << 7
+				dest[outputOffset+2] = input[4] >> 1
+				fallthrough
+			case 4:
+				dest[outputOffset+2] |= input[3] << 4
+				dest[outputOffset+1] = input[3] >> 4
+				fallthrough
+			case 3:
+				dest[outputOffset+1] |= input[2] << 1
+				fallthrough
+			case 2:
+				dest[outputOffset+1] |= input[1] << 6
+				dest[outputOffset] = input[1] >> 2
+				fallthrough
+			case 1:
+				dest[outputOffset] |= input[0] << 3
+			}
+
+			// if there are fewer than 8 characters left in the input string, we're done
+			if len(input) < 8 {
+				break
+			}
+
+			// pop off first 8 characters of the 32-bit encoded string
+			input = input[8:]
+			// advance output position by 5 bytes
+			outputOffset += 5
+		}
+
+		return dest, nil */
+}
+
+func ByteSquasher(input []byte, inputWidth, outputWidth uint32) ([]byte, error) {
+	var bitstash, accumulator uint32
+	var output []byte
+	maxOutputValue := uint32((1 << outputWidth) - 1)
+	for i, c := range input {
+		if c>>inputWidth != 0 {
+			return nil, fmt.Errorf("byte %d (%x) high bits set", i, c)
+		}
+		accumulator = (accumulator << inputWidth) | uint32(c)
+		bitstash += inputWidth
+		for bitstash >= outputWidth {
+			bitstash -= outputWidth
+			output = append(output,
+				byte((accumulator>>bitstash)&maxOutputValue))
 		}
 	}
-
-	outputOffset := 0
-
-	// round up and divide to get output length
-	dest := make([]byte, (((len(input) * 5) + 7) / 8))
-
-	//	fmt.Printf("5 to 8 input len %d output len %d\n", len(input), len(dest))
-
-	for len(input) > 0 {
-
-		switch len(input) {
-		default:
-			dest[outputOffset+4] = input[7]
-			fallthrough
-		case 7:
-			dest[outputOffset+4] |= input[6] << 5
-			dest[outputOffset+3] = input[6] >> 3
-			fallthrough
-		case 6:
-			dest[outputOffset+3] |= input[5] << 2
-			fallthrough
-		case 5:
-			dest[outputOffset+3] |= input[4] << 7
-			dest[outputOffset+2] = input[4] >> 1
-			fallthrough
-		case 4:
-			dest[outputOffset+2] |= input[3] << 4
-			dest[outputOffset+1] = input[3] >> 4
-			fallthrough
-		case 3:
-			dest[outputOffset+1] |= input[2] << 1
-			fallthrough
-		case 2:
-			dest[outputOffset+1] |= input[1] << 6
-			dest[outputOffset] = input[1] >> 2
-			fallthrough
-		case 1:
-			dest[outputOffset] |= input[0] << 3
+	// pad if going from 8 to 5
+	if inputWidth == 8 && outputWidth == 5 {
+		if bitstash != 0 {
+			output = append(output,
+				byte((accumulator << (outputWidth - bitstash) & maxOutputValue)))
 		}
-
-		// if there are fewer than 8 characters left in the input string, we're done
-		if len(input) < 8 {
-			break
-		}
-
-		// pop off first 8 characters of the 32-bit encoded string
-		input = input[8:]
-		// advance output position by 5 bytes
-		outputOffset += 5
+	} else if bitstash >= inputWidth ||
+		((accumulator<<(outputWidth-bitstash))&maxOutputValue) != 0 {
+		// no pad from 5 to 8 allowed
+		return nil, fmt.Errorf(
+			"invalid padding from %d to %d bits", inputWidth, outputWidth)
 	}
-
-	return dest, nil
+	return output, nil
 }
 
 // EncodeString swaps 5-bit bytes with a string of the corresponding letters
@@ -314,9 +351,17 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 		return nil, fmt.Errorf("Invalid witness program version %d", data[0])
 	}
 	if version == 0 && len(data) != 20 && len(data) != 32 {
-		return nil, fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
+		return data, fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
 	}
-	return append([]byte{version}, data...), nil
+
+	// first give version byte, then push length
+	if version > 0 {
+		version |= 0x80
+	}
+	outputScript := append([]byte{version}, byte(len(data)))
+	outputScript = append(outputScript, data...)
+
+	return outputScript, nil
 }
 
 //
