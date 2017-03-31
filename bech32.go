@@ -98,7 +98,7 @@ func StringToSquashedBytes(input string) ([]byte, error) {
 }
 
 // PolyMod takes a byte slice and returns the 32-bit BCH checksum.
-// Note that the input byets to PolyMod need to be squashed to 5-bits tall
+// Note that the input bytes to PolyMod need to be squashed to 5-bits tall
 // before being used in this function.  And this function will not error,
 // but instead return an unsuable checksum, if you give it full-height bytes.
 func PolyMod(values []byte) uint32 {
