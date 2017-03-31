@@ -72,29 +72,55 @@ var (
 	}
 )
 
+// TestRandomEncodeDecode makes some random addresses and makes sure
+// the same data comes out as went in
 func TestRandomEncodeDecode(t *testing.T) {
-	data := make([]byte, 20)
-	_, _ = rand.Read(data)
 
-	hrp := "test"
+	tHrp := "testhrp"
 
-	adr := Encode(hrp, data)
+	tbHrp := "tb"
 
-	hrp2, data2, err := Decode(adr)
-	if err != nil {
-		t.Fatal(err)
+	for i := 0; i < 20; i++ {
+		data := make([]byte, 20)
+		_, _ = rand.Read(data)
+
+		// create an arbitrary, non-segwit address
+		nonSegWitAdr := Encode(tHrp, data)
+		tHrp2, data2, err := Decode(nonSegWitAdr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tHrp2 != tHrp {
+			t.Fatalf("hrp mismatch %s, %s", tHrp2, tHrp)
+		}
+		if !bytes.Equal(data, data2) {
+			t.Fatalf("data mismatch %x, %x", data, data2)
+		}
+
+		// append a 0x00, 0x14 to make it a p2wpkh script
+		data = append([]byte{0x00, 0x14}, data...)
+
+		// make a testnet address with the same 20 byte pubkeyhash
+		segWitAdr, err := SegWitAddressEncode(tbHrp, data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// parse the segwit address we just created back into data
+		data2, err = SegWitAddressDecode(segWitAdr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// check that the data is still intact
+		if !bytes.Equal(data, data2) {
+			t.Fatalf("data mismatch %x, %x", data, data2)
+		}
 	}
-	if hrp2 != hrp {
-		t.Fatalf("hrp mismatch %s, %s", hrp, hrp2)
-	}
-	if !bytes.Equal(data, data2) {
-		t.Fatalf("data mismatch %x, %x", data, data2)
-	}
-
 }
 
+// TestHardCoded checks the hard-coded test vectors descrbed in the BIP
 func TestHardCoded(t *testing.T) {
-
+	// check that all the valid addresses check out as valid
 	for _, adr := range validChecksum {
 		_, _, err := Decode(adr)
 		if err != nil {
@@ -102,6 +128,7 @@ func TestHardCoded(t *testing.T) {
 		}
 	}
 
+	// invalid addresses should all have some kind of error
 	for _, adr := range invalidAddress {
 		data, err := SegWitAddressDecode(adr)
 		if err == nil {
@@ -110,6 +137,8 @@ func TestHardCoded(t *testing.T) {
 		}
 	}
 
+	// check that all the valid segwit addresses come out valid, and that
+	// they match the data provided
 	for _, swadr := range validSegwitAddresses {
 		data, err := SegWitAddressDecode(swadr.address)
 		if err != nil {
@@ -121,5 +150,4 @@ func TestHardCoded(t *testing.T) {
 				swadr.address, swadr.data, data)
 		}
 	}
-
 }

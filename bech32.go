@@ -5,8 +5,14 @@ import (
 	"strings"
 )
 
+// charset is the sequence of ascii characters that make up the bech32
+// alphabet.  Each character represents a 5-bit squashed byte.
+// q = 0b00000, p = 0b00001, z = 0b00010, and so on.
 const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
+// inverseCharset is a mapping of 8-bit ascii characters to the charset
+// positions.  Both uppercase and lowercase ascii are mapped to the 5-bit
+// position values.
 var inverseCharset = [256]int8{
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -19,127 +25,22 @@ var inverseCharset = [256]int8{
 
 // Bytes8to5 extends a byte slice into a longer, padded byte slice of 5-bit elements
 // where the high 3 bits are all 0.
-// Need to pad here, but not in the 5 to 8 function
 func Bytes8to5(input []byte) []byte {
 	// no way to triger an error going from 8 to 5
 	output, _ := ByteSquasher(input, 8, 5)
 	return output
-	/*
-		// round up divistion for output length
-		outputLength := (((len(input)) * 8) + 4) / 5
-
-		dest := make([]byte, outputLength)
-
-		outputOffset := 0
-
-		//	fmt.Printf("8 to 5 input len %d output len %d\n", len(input), len(dest))
-		// Continue until input has been consumed
-		for len(input) > 0 {
-
-			// 5 input bytes, map to 8 output bytes
-			// got switches from base32 stdlib
-			switch len(input) {
-			default:
-				dest[outputOffset+7] = input[4] & 0x1f
-				dest[outputOffset+6] = input[4] >> 5
-				fallthrough
-			case 4:
-				dest[outputOffset+6] |= (input[3] << 3) & 0x1f
-				dest[outputOffset+5] = (input[3] >> 2) & 0x1f
-				dest[outputOffset+4] = input[3] >> 7
-				fallthrough
-			case 3:
-				dest[outputOffset+4] |= (input[2] << 1) & 0x1f
-				dest[outputOffset+3] = (input[2] >> 4) & 0x1f
-				fallthrough
-			case 2:
-				dest[outputOffset+3] |= (input[1] << 4) & 0x1f
-				dest[outputOffset+2] = (input[1] >> 1) & 0x1f
-				dest[outputOffset+1] = (input[1] >> 6) & 0x1f
-				fallthrough
-			case 1:
-				dest[outputOffset+1] |= (input[0] << 2) & 0x1f
-				dest[outputOffset+0] = input[0] >> 3
-			}
-
-			if len(input) < 5 {
-				break
-			}
-
-			// pop off first 5 bytes of input slice as we're done with them
-			input = input[5:]
-			// our output slice has advanced 8 bytes for the next round
-			outputOffset += 8
-		}
-
-		return dest */
 }
 
+// Bytes5to8 goes from squashed bytes to full height bytes
 func Bytes5to8(input []byte) ([]byte, error) {
-
 	return ByteSquasher(input, 5, 8)
-
-	/*
-		// first check that high 3 bits for all bytes are 0
-		for i, b := range input {
-			if b&0xe0 != 0 {
-				return nil, fmt.Errorf("Invalid byte at position %d: %x", i, b)
-			}
-		}
-
-		outputOffset := 0
-
-		// round up and divide to get output length
-		dest := make([]byte, (((len(input) * 5) + 7) / 8))
-
-		fmt.Printf("5 to 8 input len %d output len %d\n", len(input), len(dest))
-
-		for len(input) > 0 {
-
-			switch len(input) {
-			default:
-				dest[outputOffset+4] = input[7]
-				fallthrough
-			case 7:
-				dest[outputOffset+4] |= input[6] << 5
-				dest[outputOffset+3] = input[6] >> 3
-				fallthrough
-			case 6:
-				dest[outputOffset+3] |= input[5] << 2
-				fallthrough
-			case 5:
-				dest[outputOffset+3] |= input[4] << 7
-				dest[outputOffset+2] = input[4] >> 1
-				fallthrough
-			case 4:
-				dest[outputOffset+2] |= input[3] << 4
-				dest[outputOffset+1] = input[3] >> 4
-				fallthrough
-			case 3:
-				dest[outputOffset+1] |= input[2] << 1
-				fallthrough
-			case 2:
-				dest[outputOffset+1] |= input[1] << 6
-				dest[outputOffset] = input[1] >> 2
-				fallthrough
-			case 1:
-				dest[outputOffset] |= input[0] << 3
-			}
-
-			// if there are fewer than 8 characters left in the input string, we're done
-			if len(input) < 8 {
-				break
-			}
-
-			// pop off first 8 characters of the 32-bit encoded string
-			input = input[8:]
-			// advance output position by 5 bytes
-			outputOffset += 5
-		}
-
-		return dest, nil */
 }
 
+// ByteSquasher squashes full-width (8-bit) bytes into "squashed" 5-bit bytes,
+// and vice versa.  It can operate on other widths but in this backage only
+// goes 5 to 8 and back again.  It can return an error if the squashed input
+// you give it isn't actually squashed, or if there is padding (trailing q characters)
+// when going from 5 to 8
 func ByteSquasher(input []byte, inputWidth, outputWidth uint32) ([]byte, error) {
 	var bitstash, accumulator uint32
 	var output []byte
@@ -171,8 +72,8 @@ func ByteSquasher(input []byte, inputWidth, outputWidth uint32) ([]byte, error) 
 	return output, nil
 }
 
-// EncodeString swaps 5-bit bytes with a string of the corresponding letters
-func BytesToString(input []byte) (string, error) {
+// SquashedBytesToString swaps 5-bit bytes with a string of the corresponding letters
+func SquashedBytesToString(input []byte) (string, error) {
 	var s string
 	for i, c := range input {
 		if c&0xe0 != 0 {
@@ -183,7 +84,9 @@ func BytesToString(input []byte) (string, error) {
 	return s, nil
 }
 
-func StringToBytes(input string) ([]byte, error) {
+// StringToSquashedBytes uses the inverseCharset to switch from the characters
+// back to 5-bit squashed bytes.
+func StringToSquashedBytes(input string) ([]byte, error) {
 	b := make([]byte, len(input))
 	for i, c := range input {
 		if inverseCharset[c] == -1 {
@@ -194,12 +97,18 @@ func StringToBytes(input string) ([]byte, error) {
 	return b, nil
 }
 
-// PolyMod takes a slice and give the polymod *uint32*.  I think
+// PolyMod takes a byte slice and returns the 32-bit BCH checksum.
+// Note that the input byets to PolyMod need to be squashed to 5-bits tall
+// before being used in this function.  And this function will not error,
+// but instead return an unsuable checksum, if you give it full-height bytes.
 func PolyMod(values []byte) uint32 {
+
+	// magic generator uint32s
 	gen := []uint32{
 		0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3,
 	}
 
+	// start with 1
 	chk := uint32(1)
 
 	for _, v := range values {
@@ -242,6 +151,7 @@ func CreateChecksum(hrp string, data []byte) []byte {
 	values = append(values, make([]byte, 6)...)
 	//get checksum for whole slice
 
+	// flip the LSB of the checksum data after creating it
 	checksum := PolyMod(values) ^ 1
 
 	for i := 0; i < 6; i++ {
@@ -257,27 +167,35 @@ func CreateChecksum(hrp string, data []byte) []byte {
 func VerifyChecksum(hrp string, data []byte) bool {
 	values := append(HRPExpand(hrp), data...)
 	checksum := PolyMod(values)
-	//	fmt.Printf("checksum %x\n", checksum)
+	// make sure it's 1 (from the LSB flip in CreateChecksum
 	return checksum == 1
 }
 
+// Encode takes regular bytes of data, and an hrp prefix, and returns the
+// bech32 encoded string.  It doesn't do any segwit specific encoding.
 func Encode(hrp string, data []byte) string {
 	fiveData := Bytes8to5(data)
 	return EncodeSquashed(hrp, fiveData)
 }
 
+// EncodeSquashed takes the hrp prefix, as well as byte data that has already
+// been squashed to 5-bits high, and returns the bech32 encoded string.
+// It does not return an error; if you give it non-squashed data it will return
+// an empty string.
 func EncodeSquashed(hrp string, data []byte) string {
 	combined := append(data, CreateChecksum(hrp, data)...)
 
-	// ignore error as we just five'd it
-	dataString, err := BytesToString(combined)
+	// Should be squashed, return empty string if it's not.
+	dataString, err := SquashedBytesToString(combined)
 	if err != nil {
-		panic(err)
+		return ""
 	}
-
 	return hrp + "1" + dataString
 }
 
+// Decode takes a bech32 encoded string and returns the hrp and the full-height
+// data.  Can error out for various reasons, mostly problems in the string given.
+// Doesn't do anything segwit specific.
 func Decode(adr string) (string, []byte, error) {
 	hrp, squashedData, err := DecodeSquashed(adr)
 	if err != nil {
@@ -290,15 +208,20 @@ func Decode(adr string) (string, []byte, error) {
 	return hrp, data, nil
 }
 
+// DecodeSquashed is the same as Decode, but will return squashed 5-bit high
+// data.
 func DecodeSquashed(adr string) (string, []byte, error) {
 
+	// make an all lowercase and all uppercase version of the input string
 	lowAdr := strings.ToLower(adr)
 	highAdr := strings.ToUpper(adr)
 
+	// if there's mixed case, that's not OK
 	if adr != lowAdr && adr != highAdr {
 		return "", nil, fmt.Errorf("mixed case address")
 	}
 
+	// defualt to lowercase
 	adr = lowAdr
 
 	// find the last "1" and split there
@@ -306,27 +229,79 @@ func DecodeSquashed(adr string) (string, []byte, error) {
 	if splitLoc == -1 {
 		return "", nil, fmt.Errorf("1 separator not present in address")
 	}
+
+	// hrp comes before the split
 	hrp := adr[0:splitLoc]
 
-	data, err := StringToBytes(adr[splitLoc+1:])
+	// get squashed data
+	data, err := StringToSquashedBytes(adr[splitLoc+1:])
 	if err != nil {
 		return "", nil, err
 	}
 
+	// make sure checksum works
 	sumOK := VerifyChecksum(hrp, data)
 	if !sumOK {
 		return "", nil, fmt.Errorf("Checksum invalid")
 	}
+
+	// chop off checksum to return only payload
 	data = data[:len(data)-6]
 
 	return hrp, data, nil
 }
 
+// SegWitAddressEncode takes an hrp and data and gives back a segwit address.
+// The data that goes in should be the full pkscript from the txout, including the
+// version byte and the pushdata byte.
 func SegWitAddressEncode(hrp string, data []byte) (string, error) {
-	//	combined := append(data, CreateChecksum(hrp, data))
-	return "", nil
+
+	if len(data) < 4 {
+		return "", fmt.Errorf("data too short (%d bytes)", len(data))
+	}
+	// first byte is the version number.  that shouldn't be more than
+	// 16, so only 4 bits, doesn't need to be squashed
+	version := data[0]
+	// the next byte is the length.  make sure it's right
+	length := data[1]
+
+	// the rest of the data is real data and needs to be squashed
+	data = data[2:]
+
+	if int(length) != len(data) {
+		return "", fmt.Errorf(
+			"push byte / payload length mismatch: %d, %d", length, len(data))
+	}
+
+	// only 2 networks currently supported: mainnet and testnet3
+	if hrp != "bc" && hrp != "tb" {
+		return "", fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
+	}
+	// 1 byte programs are not ok.  Also 40 bytes should be enough for anyone.
+	if len(data) < 2 || len(data) > 40 {
+		return "", fmt.Errorf("Data length %d out of bounds", len(data))
+	}
+	// Better get all your features in soon; only 16 possible script versions.
+	if version > 16 {
+		return "", fmt.Errorf("Invalid witness program version %d", data[0])
+	}
+	// version 0 scripts can only be 20 bytes (p2wpkh) or 32 bytes (p2wsh)
+	if version == 0 && len(data) != 20 && len(data) != 32 {
+		return "", fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
+	}
+
+	// squash payload data
+	squashedData := Bytes8to5(data)
+	// prepend version byte
+	squashedData = append([]byte{version}, squashedData...)
+
+	address := EncodeSquashed(hrp, squashedData)
+
+	return address, nil
 }
 
+// SegWitAddressDecode takes a segwit address and returns the pkscript that
+// can go directly into the txout.  (includes version byte and data push byte)
 func SegWitAddressDecode(adr string) ([]byte, error) {
 	hrp, squashedData, err := DecodeSquashed(adr)
 	if err != nil {
@@ -351,7 +326,7 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 		return nil, fmt.Errorf("Invalid witness program version %d", data[0])
 	}
 	if version == 0 && len(data) != 20 && len(data) != 32 {
-		return data, fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
+		return nil, fmt.Errorf("expect 20 or 32 byte v0 witprog, got %d", len(data))
 	}
 
 	// first give version byte, then push length
@@ -363,5 +338,3 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 
 	return outputScript, nil
 }
-
-//
