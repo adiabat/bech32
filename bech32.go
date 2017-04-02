@@ -338,3 +338,23 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 
 	return outputScript, nil
 }
+
+// Bc1AdrFromPKH creates a v0 mainnet address from a 20 or 32 byte pkh/sh
+// only possible error is invalid size of []byte argument
+func Bc1AdrFromPKH(in []byte) (string, error) {
+	if len(in) != 20 && len(in) != 32 {
+		return "", fmt.Errorf("Invalid len %d, expect 20 or 32", len(in))
+	}
+	data := []byte{0, byte(len(in))}
+	data = append(data, in...)
+	return SegWitAddressEncode("bc", data)
+}
+
+func Tb1AdrFromPKH(in []byte) (string, error) {
+	if len(in) != 20 && len(in) != 32 {
+		return "", fmt.Errorf("Invalid len %d, expect 20 or 32", len(in))
+	}
+	data := []byte{0, byte(len(in))}
+	data = append(data, in...)
+	return SegWitAddressEncode("tb", data)
+}
