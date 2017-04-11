@@ -221,7 +221,7 @@ func DecodeSquashed(adr string) (string, []byte, error) {
 		return "", nil, fmt.Errorf("mixed case address")
 	}
 
-	// defualt to lowercase
+	// default to lowercase
 	adr = lowAdr
 
 	// find the last "1" and split there
