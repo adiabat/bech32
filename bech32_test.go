@@ -83,7 +83,7 @@ func TestRandomEncodeDecode(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		data := make([]byte, 20)
 		_, _ = rand.Read(data)
-
+		rand.Int63()
 		// create an arbitrary, non-segwit address
 		nonSegWitAdr := Encode(tHrp, data)
 		tHrp2, data2, err := Decode(nonSegWitAdr)

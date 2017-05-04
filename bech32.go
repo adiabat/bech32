@@ -199,11 +199,11 @@ func EncodeSquashed(hrp string, data []byte) string {
 func Decode(adr string) (string, []byte, error) {
 	hrp, squashedData, err := DecodeSquashed(adr)
 	if err != nil {
-		return "", nil, err
+		return hrp, nil, err
 	}
 	data, err := Bytes5to8(squashedData)
 	if err != nil {
-		return "", nil, err
+		return hrp, nil, err
 	}
 	return hrp, data, nil
 }
@@ -236,13 +236,13 @@ func DecodeSquashed(adr string) (string, []byte, error) {
 	// get squashed data
 	data, err := StringToSquashedBytes(adr[splitLoc+1:])
 	if err != nil {
-		return "", nil, err
+		return hrp, nil, err
 	}
 
 	// make sure checksum works
 	sumOK := VerifyChecksum(hrp, data)
 	if !sumOK {
-		return "", nil, fmt.Errorf("Checksum invalid")
+		return hrp, nil, fmt.Errorf("Checksum invalid")
 	}
 
 	// chop off checksum to return only payload
@@ -273,10 +273,10 @@ func SegWitAddressEncode(hrp string, data []byte) (string, error) {
 			"push byte / payload length mismatch: %d, %d", length, len(data))
 	}
 
-	// only 2 networks currently supported: mainnet and testnet3
-	if hrp != "bc" && hrp != "tb" {
-		return "", fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
-	}
+	// allow alts
+	//	if hrp != "bc" && hrp != "tb" {
+	//		return "", fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
+	//	}
 	// 1 byte programs are not ok.  Also 40 bytes should be enough for anyone.
 	if len(data) < 2 || len(data) > 40 {
 		return "", fmt.Errorf("Data length %d out of bounds", len(data))
@@ -303,7 +303,7 @@ func SegWitAddressEncode(hrp string, data []byte) (string, error) {
 // SegWitAddressDecode takes a segwit address and returns the pkscript that
 // can go directly into the txout.  (includes version byte and data push byte)
 func SegWitAddressDecode(adr string) ([]byte, error) {
-	hrp, squashedData, err := DecodeSquashed(adr)
+	_, squashedData, err := DecodeSquashed(adr)
 	if err != nil {
 		return nil, err
 	}
@@ -315,9 +315,10 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if hrp != "bc" && hrp != "tb" {
-		return nil, fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
-	}
+	// Allow alts
+	//	if hrp != "bc" && hrp != "tb" {
+	//		return nil, fmt.Errorf("prefix %s is not bitcoin or testnet", hrp)
+	//	}
 	if len(data) < 2 || len(data) > 40 {
 		return nil, fmt.Errorf("Data length %d out of bounds", len(data))
 	}
@@ -339,22 +340,14 @@ func SegWitAddressDecode(adr string) ([]byte, error) {
 	return outputScript, nil
 }
 
-// Bc1AdrFromPKH creates a v0 mainnet address from a 20 or 32 byte pkh/sh
-// only possible error is invalid size of []byte argument
-func Bc1AdrFromPKH(in []byte) (string, error) {
-	if len(in) != 20 && len(in) != 32 {
-		return "", fmt.Errorf("Invalid len %d, expect 20 or 32", len(in))
+// SegWitV0Encode takes an hrp prefix string and a 20 or 32 byte witness program
+// hash, and turns it into a version 0 address.  (it puts the 0 and pushdata in
+// for you.
+func SegWitV0Encode(hrp string, data []byte) (string, error) {
+	if len(data) != 20 && len(data) != 32 {
+		return "", fmt.Errorf("Invalid data length %d, expect 20 or 32", len(data))
 	}
-	data := []byte{0, byte(len(in))}
-	data = append(data, in...)
-	return SegWitAddressEncode("bc", data)
-}
-
-func Tb1AdrFromPKH(in []byte) (string, error) {
-	if len(in) != 20 && len(in) != 32 {
-		return "", fmt.Errorf("Invalid len %d, expect 20 or 32", len(in))
-	}
-	data := []byte{0, byte(len(in))}
-	data = append(data, in...)
-	return SegWitAddressEncode("tb", data)
+	script := []byte{0, byte(len(data))}
+	script = append(script, data...)
+	return SegWitAddressEncode(hrp, script)
 }
