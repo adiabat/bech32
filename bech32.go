@@ -37,7 +37,7 @@ func Bytes5to8(input []byte) ([]byte, error) {
 }
 
 // ByteSquasher squashes full-width (8-bit) bytes into "squashed" 5-bit bytes,
-// and vice versa.  It can operate on other widths but in this backage only
+// and vice versa.  It can operate on other widths but in this package only
 // goes 5 to 8 and back again.  It can return an error if the squashed input
 // you give it isn't actually squashed, or if there is padding (trailing q characters)
 // when going from 5 to 8
@@ -221,7 +221,7 @@ func DecodeSquashed(adr string) (string, []byte, error) {
 		return "", nil, fmt.Errorf("mixed case address")
 	}
 
-	// defualt to lowercase
+	// default to lowercase
 	adr = lowAdr
 
 	// find the last "1" and split there
