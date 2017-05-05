@@ -251,6 +251,17 @@ func DecodeSquashed(adr string) (string, []byte, error) {
 	return hrp, data, nil
 }
 
+// Segwit addresses can't be used in Encode and Decode directly, because the
+// witness version is special and doesn't get squashed.  GetHRP gets the
+// HRP without checking any validity.
+func GetHRP(adr string) (string, error) {
+	splitLoc := strings.LastIndex(adr, "1")
+	if splitLoc == -1 {
+		return "", fmt.Errorf("1 separator not present in address")
+	}
+	return adr[0:splitLoc], nil
+}
+
 // SegWitAddressEncode takes an hrp and data and gives back a segwit address.
 // The data that goes in should be the full pkscript from the txout, including the
 // version byte and the pushdata byte.
